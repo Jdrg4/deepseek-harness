@@ -28,6 +28,13 @@ export interface DeepSeekCatalogModel {
   /** Encoded-byte target for one deterministic request preview; the smallest quality-ladder output is used when no quality fits. */
   imageMaxBytes?: number
   /**
+   * Per-side pixel limit applied to every request image; omission keeps
+   * {@link REQUEST_IMAGE_MAX_DIMENSION}. Declare it when the endpoint publishes a
+   * many-image limit below that default: an endpoint rejects the whole request
+   * over one oversized image, so the turn fails instead of the image shrinking.
+   */
+  imageMaxDimension?: number
+  /**
    * `'in-history'` declares that the endpoint reads the latest `system`
    * message at any position of the conversation as the complete effective
    * system prompt; omission means only a leading system message is read.

@@ -2081,6 +2081,9 @@ describe('plugin registration and config', () => {
     ['imagePixelBudget', 'auto', /imagePixelBudget must be "low" or a positive safe integer/],
     ['imageMaxBytes', 0, /imageMaxBytes must be a positive safe integer/],
     ['imageMaxBytes', 1.5, /imageMaxBytes must be a positive safe integer/],
+    ['imageMaxDimension', 0, /imageMaxDimension must be a positive safe integer/],
+    ['imageMaxDimension', 1.5, /imageMaxDimension must be a positive safe integer/],
+    ['imageMaxDimension', Number.MAX_SAFE_INTEGER + 1, /imageMaxDimension must be a positive safe integer/],
   ] as const)('rejects per-model %s=%s', (field, value, message) => {
     expect(() => resolveAdapterOptions({
       models: [{ id: 'vision', inputModalities: ['image'], [field]: value }],

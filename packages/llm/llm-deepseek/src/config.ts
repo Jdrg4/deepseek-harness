@@ -11,7 +11,7 @@ import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import type { DeepSeekCatalogModel, DeepSeekConnectionOptions } from './types.ts'
 import { DEFAULT_MODELS } from './models.ts'
 import { DEFAULT_STREAM_IDLE_TIMEOUT_MS, DEFAULT_CONTEXT_WINDOW, DEFAULT_MAX_TOKENS, DEFAULT_MAX_INLINE_REQUEST_IMAGE_BYTES, DEFAULT_IMAGE_OFFLOAD_BYTE_QUANTUM, DEFAULT_INLINE_IMAGE_OFFLOAD_BYTE_QUANTUM, DEFAULT_IMAGE_OFFLOAD_COUNT_QUANTUM, DEFAULT_FILE_EXPIRY_SECONDS, DEFAULT_FILE_REFRESH_MARGIN_SECONDS, DEFAULT_FILE_QUOTA_CLEANUP_BATCH, DEFAULT_FILES_API_TIMEOUT_MS } from './defaults.ts'
-import { DEFAULT_MAX_IMAGES_PER_REQUEST, DEFAULT_MAX_REQUEST_FILES_BYTES, DEFAULT_REQUEST_IMAGE_MAX_BYTES } from './request-pricing.ts'
+import { DEFAULT_MAX_IMAGES_PER_REQUEST, DEFAULT_MAX_REQUEST_FILES_BYTES, DEFAULT_REQUEST_IMAGE_MAX_BYTES, REQUEST_IMAGE_MAX_DIMENSION } from './request-pricing.ts'
 
 const MODEL_MODALITIES = ['text', 'image'] as const satisfies readonly ModelModality[]
 
@@ -78,6 +78,7 @@ export const catalogModelFields = {
   maxTokens: z.number().step(1).min(1),
   imagePixelBudget: z.union([z.number().step(1).min(1), 'low']),
   imageMaxBytes: z.number().step(1).min(1),
+  imageMaxDimension: z.number().step(1).min(1),
   systemPromptUpdate: z.const('in-history'),
   toolUpdate: z.union(['in-history', 'addition-only'] as const),
 }
@@ -167,7 +168,7 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
       throw new Error(`llm-deepseek: catalog model "${model.id}" inputModalities must not contain duplicates`)
     }
     const hasImage = inputModalities.includes('image')
-    if (!hasImage && (model.imagePixelBudget !== undefined || model.imageMaxBytes !== undefined)) {
+    if (!hasImage && (model.imagePixelBudget !== undefined || model.imageMaxBytes !== undefined || model.imageMaxDimension !== undefined)) {
       throw new Error(`llm-deepseek: text-only catalog model "${model.id}" cannot declare image request limits`)
     }
     if (model.imagePixelBudget !== undefined
@@ -178,6 +179,10 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
     if (model.imageMaxBytes !== undefined
       && (!Number.isSafeInteger(model.imageMaxBytes) || model.imageMaxBytes <= 0)) {
       throw new Error(`llm-deepseek: catalog model "${model.id}" imageMaxBytes must be a positive safe integer`)
+    }
+    if (model.imageMaxDimension !== undefined
+      && (!Number.isSafeInteger(model.imageMaxDimension) || model.imageMaxDimension <= 0)) {
+      throw new Error(`llm-deepseek: catalog model "${model.id}" imageMaxDimension must be a positive safe integer`)
     }
     // Widened: a dynamic config update reaches this check without schema validation.
     const systemPromptUpdate: string | undefined = model.systemPromptUpdate
@@ -203,6 +208,7 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
         ? {
           ...model.imagePixelBudget === undefined ? {} : { imagePixelBudget: model.imagePixelBudget },
           imageMaxBytes: model.imageMaxBytes ?? DEFAULT_REQUEST_IMAGE_MAX_BYTES,
+          imageMaxDimension: model.imageMaxDimension ?? REQUEST_IMAGE_MAX_DIMENSION,
         }
         : {},
     }

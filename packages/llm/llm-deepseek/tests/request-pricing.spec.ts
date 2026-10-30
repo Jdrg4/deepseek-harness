@@ -3,7 +3,7 @@ import { offloadedImageText, requestImageHandleText, textOnlyImageText } from '@
 import type { ImageBlock } from '@deepseek-ai/dsh-llm'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import { deepSeekImageRequestPricing } from '../src/request-pricing.ts'
+import { deepSeekImageRequestPricing, resolveRequestImageTarget } from '../src/request-pricing.ts'
 import { resolveAdapterOptions } from '../src/index.ts'
 import type { Options as Config } from '../src/index.ts'
 import { adapter } from './helpers.ts'
@@ -65,6 +65,21 @@ describe('DeepSeek request-image pricing', () => {
       visualTokens: tokens,
       text: requestImageHandleText(image, { width: cappedWidth, height: cappedHeight }),
     }])
+  })
+
+  it.each([
+    [8192, 1, 3000, 1],
+    [1, 8192, 1, 3000],
+  ])('caps a %sx%s image at the model\'s own per-side limit of %sx%s', (width, height, cappedWidth, cappedHeight) => {
+    const options = resolveAdapterOptions({ models: [{ ...VISION_MODEL, imageMaxDimension: 3000 }] })
+    const target = resolveRequestImageTarget(options.models[0]!, { width, height })
+    expect(target).toMatchObject({ width: cappedWidth, height: cappedHeight })
+  })
+
+  it('keeps the endpoint default per-side limit when a model declares none', () => {
+    const options = resolveAdapterOptions({ models: [VISION_MODEL] })
+    expect(resolveRequestImageTarget(options.models[0]!, { width: 8192, height: 1 }))
+      .toMatchObject({ width: 4096, height: 1 })
   })
 
   it('prices the sent dimensions when aspect-preserving projection changes the token grid', () => {

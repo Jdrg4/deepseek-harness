@@ -25,8 +25,12 @@ export const DEFAULT_LOW_DETAIL_IMAGE_PIXEL_BUDGET = 512 * 512
 /** Encoded-byte target for one deterministic model-request image; the smallest quality-ladder output is used when no quality fits. */
 export const DEFAULT_REQUEST_IMAGE_MAX_BYTES = 2 * 1024 * 1024
 /**
- * Provider per-side limit for a request carrying 15 or more images, applied
- * to every request image so the image count never changes a projection.
+ * Default per-side limit applied to every request image, so the image count never
+ * changes a projection. It is not universal: an endpoint that publishes a lower
+ * many-image limit fails the whole request instead of shrinking the image, as
+ * Anthropic's Messages API does with "At least one of the image dimensions exceed
+ * max allowed size for many-image requests: 3000 pixels". Such an endpoint's
+ * catalog entry declares {@link DeepSeekCatalogModel.imageMaxDimension}.
  */
 export const REQUEST_IMAGE_MAX_DIMENSION = 4096
 
@@ -38,6 +42,16 @@ export const REQUEST_IMAGE_MAX_DIMENSION = 4096
  */
 export function resolveRequestImageMaxBytes(model: DeepSeekCatalogModel): number {
   return model.imageMaxBytes ?? DEFAULT_REQUEST_IMAGE_MAX_BYTES
+}
+
+/**
+ * Resolve the per-side pixel limit one DeepSeek model route applies to every request image.
+ * @param model - Advertised model route and its optional image overrides.
+ * @returns the route's per-side pixel limit.
+ * @internal
+ */
+export function resolveRequestImageMaxDimension(model: DeepSeekCatalogModel): number {
+  return model.imageMaxDimension ?? REQUEST_IMAGE_MAX_DIMENSION
 }
 
 /**
@@ -58,8 +72,9 @@ export function resolveRequestImageTarget(
   const projected = budget === undefined
     ? deepSeekRequestImageDimensions(source.width, source.height)
     : requestImageDimensions(source.width, source.height, budget)
-  const capped = Math.max(projected.width, projected.height) > REQUEST_IMAGE_MAX_DIMENSION
-    ? longEdgeDimensions(source.width, source.height, REQUEST_IMAGE_MAX_DIMENSION)
+  const maxDimension = resolveRequestImageMaxDimension(model)
+  const capped = Math.max(projected.width, projected.height) > maxDimension
+    ? longEdgeDimensions(source.width, source.height, maxDimension)
     : projected
   return { ...capped, maxBytes: resolveRequestImageMaxBytes(model) }
 }
